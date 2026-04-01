@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}-backend
+  namespace: ${TARGET_NAMESPACE}
+  labels:
+    app: ${APP_NAME}
+    component: backend
+spec:
+  replicas: ${BACKEND_REPLICAS}
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+      component: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}
+        component: backend
+    spec:
+      imagePullSecrets:
+        - name: ${REGISTRY_SECRET_NAME}
+      containers:
+        - name: backend
+          image: ${BACKEND_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: ${BACKEND_PORT}
+          env:
+            # These variables help the backend prove which cluster and environment served the request.
+            - name: APP_NAME
+              value: ${APP_NAME}
+            - name: APP_VERSION
+              value: ${APP_VERSION}
+            - name: CLUSTER_NAME
+              value: ${CLUSTER_NAME}
+            - name: DEPLOY_ENV
+              value: ${DEPLOY_ENV}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: ${BACKEND_PORT}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: ${BACKEND_PORT}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

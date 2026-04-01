@@ -1,0 +1,53 @@
+---
+# This registry is safe to store in Git because it contains metadata only.
+# Credentials stay in Vault or Jenkins credentials.
+managed_clusters:
+  - name: local-lab
+    provider: kubeadm
+    region: local
+    environment: staging
+    kube_context: kubernetes-admin@homework-cluster
+    release_namespace: staging
+    ingress_domain_suffix: apps.local
+  - name: ack-shanghai-prod
+    provider: ack
+    region: cn-shanghai
+    environment: production
+    kube_context: ack-shanghai-prod
+    release_namespace: production
+    ingress_domain_suffix: apps.example.cn
+  - name: cce-beijing-staging
+    provider: cce
+    region: cn-beijing
+    environment: staging
+    kube_context: cce-beijing-staging
+    release_namespace: staging
+    ingress_domain_suffix: apps.example.cn
+  - name: tke-shenzhen-prod
+    provider: tke
+    region: ap-shenzhen
+    environment: production
+    kube_context: tke-shenzhen-prod
+    release_namespace: production
+    ingress_domain_suffix: apps.example.cn
+  - name: eks-us-east-1-prod
+    provider: eks
+    region: us-east-1
+    environment: production
+    kube_context: eks-us-east-1-prod
+    release_namespace: production
+    ingress_domain_suffix: apps.example.com
+  - name: gke-europe-west1-staging
+    provider: gke
+    region: europe-west1
+    environment: staging
+    kube_context: gke-europe-west1-staging
+    release_namespace: staging
+    ingress_domain_suffix: apps.example.com
+  - name: aks-eastus-prod
+    provider: aks
+    region: eastus
+    environment: production
+    kube_context: aks-eastus-prod
+    release_namespace: production
+    ingress_domain_suffix: apps.example.com

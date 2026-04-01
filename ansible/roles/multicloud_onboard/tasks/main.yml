@@ -1,0 +1,54 @@
+---
+- name: Load the managed cluster registry from the repository
+  ansible.builtin.include_vars:
+    file: "{{ managed_clusters_file }}"
+    name: cluster_registry
+
+- name: Validate that the merged multi-cloud kubeconfig source was provided through Vault
+  ansible.builtin.assert:
+    that:
+      - vault_multicloud_kubeconfig_source is defined
+    fail_msg: "vault_multicloud_kubeconfig_source must be defined in multicloud.yml.vault."
+
+- name: Ensure the local kubeconfig directory exists on the Linux control node
+  ansible.builtin.file:
+    path: "{{ multicloud_kubeconfig_path | dirname }}"
+    state: directory
+    mode: "0700"
+
+- name: Install the merged multi-cloud kubeconfig locally
+  ansible.builtin.copy:
+    src: "{{ vault_multicloud_kubeconfig_source }}"
+    dest: "{{ multicloud_kubeconfig_path }}"
+    mode: "0600"
+
+- name: Validate that each managed cluster context exists in the kubeconfig
+  ansible.builtin.command: kubectl config get-contexts {{ item.kube_context }} --kubeconfig {{ multicloud_kubeconfig_path }}
+  loop: "{{ cluster_registry.managed_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false
+
+- name: Ensure the shared release namespaces exist across all managed clusters
+  ansible.builtin.shell: |
+    kubectl --kubeconfig {{ multicloud_kubeconfig_path }} --context {{ item.0.kube_context }} create namespace {{ item.1 }} --dry-run=client -o yaml | \
+    kubectl --kubeconfig {{ multicloud_kubeconfig_path }} --context {{ item.0.kube_context }} apply -f -
+  loop: "{{ cluster_registry.managed_clusters | product(managed_cluster_bootstrap_namespaces) | list }}"
+  loop_control:
+    label: "{{ item.0.name }} -> {{ item.1 }}"
+  register: namespace_apply_result
+  changed_when: "'created' in namespace_apply_result.stdout or 'configured' in namespace_apply_result.stdout"
+
+- name: Create or update image pull secrets across all managed clusters
+  ansible.builtin.shell: |
+    kubectl --kubeconfig {{ multicloud_kubeconfig_path }} --context {{ item.kube_context }} -n {{ item.release_namespace }} create secret docker-registry {{ registry_secret_name }} \
+      --docker-server={{ registry_url }} \
+      --docker-username={{ vault_registry_username }} \
+      --docker-password={{ vault_registry_password }} \
+      --dry-run=client -o yaml | \
+    kubectl --kubeconfig {{ multicloud_kubeconfig_path }} --context {{ item.kube_context }} apply -f -
+  loop: "{{ cluster_registry.managed_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: registry_secret_apply
+  changed_when: "'created' in registry_secret_apply.stdout or 'configured' in registry_secret_apply.stdout"

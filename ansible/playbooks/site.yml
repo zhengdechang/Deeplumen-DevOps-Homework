@@ -1,0 +1,5 @@
+---
+- import_playbook: 01-setup-cluster.yml
+- import_playbook: 02-deploy-jenkins.yml
+- import_playbook: 03-integrate-jenkins-k8s.yml
+

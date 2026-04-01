@@ -1,0 +1,49 @@
+---
+- name: Render the Jenkins RBAC manifest
+  ansible.builtin.template:
+    src: jenkins-sa.yml.j2
+    dest: /tmp/jenkins-rbac.yml
+    mode: "0644"
+
+- name: Apply the Jenkins RBAC resources
+  ansible.builtin.command: kubectl apply -f /tmp/jenkins-rbac.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_rbac_apply
+  changed_when: "'created' in jenkins_rbac_apply.stdout or 'configured' in jenkins_rbac_apply.stdout"
+
+- name: Create a service-account token secret manifest for Jenkins
+  ansible.builtin.copy:
+    dest: /tmp/jenkins-token-secret.yml
+    mode: "0644"
+    content: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: jenkins-sa-token
+        namespace: {{ jenkins_k8s_namespace }}
+        annotations:
+          kubernetes.io/service-account.name: {{ jenkins_k8s_service_account }}
+      type: kubernetes.io/service-account-token
+
+- name: Apply the token secret manifest
+  ansible.builtin.command: kubectl apply -f /tmp/jenkins-token-secret.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_secret_apply
+  changed_when: "'created' in jenkins_secret_apply.stdout or 'configured' in jenkins_secret_apply.stdout"
+
+- name: Read the Jenkins service-account token
+  ansible.builtin.command: kubectl get secret jenkins-sa-token -n {{ jenkins_k8s_namespace }} -o jsonpath={.data.token}
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_sa_token
+  changed_when: false
+
+- name: Print the decoded token reminder for manual or JCasC registration
+  ansible.builtin.debug:
+    msg:
+      - "Jenkins service-account token was collected successfully."
+      - "Base64-decoded token:"
+      - "{{ jenkins_sa_token.stdout | b64decode }}"
+

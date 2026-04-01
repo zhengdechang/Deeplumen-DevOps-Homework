@@ -1,0 +1,94 @@
+---
+- name: Ensure the Kubernetes apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Install the Kubernetes package signing key
+  ansible.builtin.shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | gpg --dearmor -o {{ k8s_apt_keyring }}
+  args:
+    creates: "{{ k8s_apt_keyring }}"
+
+- name: Configure the Kubernetes apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    mode: "0644"
+    content: |
+      # Pin the repository channel to Kubernetes 1.29 for reproducibility.
+      {{ k8s_repo_line }}
+
+- name: Install control-plane packages with exact versions
+  ansible.builtin.apt:
+    name:
+      - "kubeadm={{ kubernetes_version }}"
+      - "kubectl={{ kubernetes_version }}"
+      - "kubelet={{ kubernetes_version }}"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages to avoid accidental upgrades
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubeadm
+    - kubectl
+    - kubelet
+
+- name: Render kubeadm configuration
+  ansible.builtin.template:
+    src: kubeadm-config.yml.j2
+    dest: /tmp/kubeadm-config.yml
+    mode: "0644"
+
+- name: Initialize the control plane only once
+  ansible.builtin.command: kubeadm init --config /tmp/kubeadm-config.yml
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Create root kubeconfig directory
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    mode: "0700"
+
+- name: Install admin kubeconfig for kubectl access on the master node
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+    mode: "0600"
+
+- name: Install Calico CNI
+  ansible.builtin.command: kubectl apply -f {{ calico_manifest_url }}
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: calico_apply
+  changed_when: "'created' in calico_apply.stdout or 'configured' in calico_apply.stdout"
+
+- name: Generate a worker join command
+  ansible.builtin.command: kubeadm token create --print-join-command
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: kube_join_command
+  changed_when: false
+
+- name: Share the join command with worker hosts through delegated facts
+  ansible.builtin.set_fact:
+    k8s_join_command: "{{ kube_join_command.stdout }}"
+  delegate_facts: true
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['k8s_worker'] }}"
+
+- name: Wait until the control-plane node is visible as Ready
+  ansible.builtin.command: kubectl get nodes --no-headers
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: node_check
+  retries: 20
+  delay: 15
+  until: "' Ready ' in (' ' + node_check.stdout + ' ')"
+  changed_when: false
+

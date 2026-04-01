@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'APP_NAME', defaultValue: 'demo-app', description: 'Application name used as the stack prefix.')
+        string(name: 'TARGET_CLUSTER', defaultValue: 'local-lab', description: 'Cluster registry name.')
+        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Image tag to deploy for both frontend and backend.')
+    }
+
+    environment {
+        MULTICLOUD_KUBECONFIG = credentials('multicloud-kubeconfig')
+    }
+
+    stages {
+        stage('Deploy Only') {
+            steps {
+                script {
+                    def selectedCluster = selectClusterContext(
+                        clusterName: params.TARGET_CLUSTER,
+                        registryFile: 'clusters/managed-clusters.yml'
+                    )
+
+                    deployToK8s(
+                        action: 'deploy',
+                        appName: params.APP_NAME,
+                        kubeconfigPath: env.MULTICLOUD_KUBECONFIG,
+                        kubeContext: selectedCluster.kubeContext,
+                        namespace: selectedCluster.releaseNamespace,
+                        clusterName: selectedCluster.name,
+                        deployEnv: selectedCluster.environment ?: 'unknown',
+                        appVersion: params.IMAGE_TAG,
+                        frontendImage: "docker.io/your-dockerhub-namespace/${params.APP_NAME}-frontend:${params.IMAGE_TAG}",
+                        backendImage: "docker.io/your-dockerhub-namespace/${params.APP_NAME}-backend:${params.IMAGE_TAG}",
+                        frontendReplicas: '2',
+                        backendReplicas: '2',
+                        frontendPort: '8080',
+                        backendPort: '8080',
+                        frontendServicePort: '80',
+                        backendServicePort: '80',
+                        ingressHost: "${params.APP_NAME}.${selectedCluster.ingressDomainSuffix}",
+                        registrySecretName: 'regcred'
+                    )
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,8 @@
+---
+# Copy this file to all.yml.vault, replace the placeholders, then encrypt it.
+vault_jenkins_admin_user: admin
+vault_jenkins_admin_password: "ChangeMe-Immediately"
+vault_registry_username: your-dockerhub-username
+vault_registry_password: "docker-registry-token"
+vault_notification_webhook_url: "https://hooks.example.invalid/replace-me"
+

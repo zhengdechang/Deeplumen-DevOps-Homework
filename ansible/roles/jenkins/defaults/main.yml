@@ -1,0 +1,5 @@
+---
+jenkins_manifest_output_dir: /tmp/jenkins-manifests
+jenkins_admin_user: "{{ vault_jenkins_admin_user }}"
+jenkins_admin_password: "{{ vault_jenkins_admin_password }}"
+

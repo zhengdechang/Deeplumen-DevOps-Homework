@@ -1,0 +1,282 @@
+{
+  "managedClusters": [
+    {
+      "name": "homework-lab-shanghai",
+      "provider": "kubeadm",
+      "region": "cn-shanghai",
+      "environment": "staging",
+      "kubeContext": "kubernetes-admin@homework-lab",
+      "releaseNamespace": "staging",
+      "ingressDomainSuffix": "apps.local",
+      "notes": "Managed from web console",
+      "source": "web"
+    }
+  ],
+  "stackReleases": [
+    {
+      "key": "homework-lab-shanghai::staging::platform-console",
+      "appName": "platform-console",
+      "targetCluster": "homework-lab-shanghai",
+      "provider": "kubeadm",
+      "region": "cn-shanghai",
+      "environment": "staging",
+      "targetNamespace": "staging",
+      "kubeContext": "kubernetes-admin@homework-lab",
+      "ingressHost": "platform-console.apps.local",
+      "imageTag": "2026.04.02",
+      "frontendImage": "docker.io/your-dockerhub-namespace/platform-console-frontend:2026.04.02",
+      "backendImage": "docker.io/your-dockerhub-namespace/platform-console-backend:2026.04.02",
+      "frontendReplicas": "2",
+      "backendReplicas": "2",
+      "executionMode": "simulate",
+      "updatedAt": "2026-04-01T17:48:11.948Z",
+      "lastAction": "update",
+      "status": "updated",
+      "previousRelease": {
+        "key": "homework-lab-shanghai::staging::platform-console",
+        "appName": "platform-console",
+        "targetCluster": "homework-lab-shanghai",
+        "provider": "kubeadm",
+        "region": "cn-shanghai",
+        "environment": "staging",
+        "targetNamespace": "staging",
+        "kubeContext": "kubernetes-admin@homework-lab",
+        "ingressHost": "platform-console.apps.local",
+        "imageTag": "2026.04.02",
+        "frontendImage": "docker.io/your-dockerhub-namespace/platform-console-frontend:2026.04.02",
+        "backendImage": "docker.io/your-dockerhub-namespace/platform-console-backend:2026.04.02",
+        "frontendReplicas": "2",
+        "backendReplicas": "2",
+        "executionMode": "simulate",
+        "updatedAt": "2026-04-01T17:21:44.661Z",
+        "lastAction": "deploy",
+        "status": "deployed",
+        "previousRelease": null
+      }
+    },
+    {
+      "key": "ack-shanghai-prod::production::demo-app",
+      "appName": "demo-app",
+      "targetCluster": "ack-shanghai-prod",
+      "provider": "ack",
+      "region": "cn-shanghai",
+      "environment": "production",
+      "targetNamespace": "production",
+      "kubeContext": "ack-shanghai-prod",
+      "ingressHost": "demo-app.apps.example.cn",
+      "imageTag": "latest",
+      "frontendImage": "docker.io/your-dockerhub-namespace/demo-app-frontend:latest",
+      "backendImage": "docker.io/your-dockerhub-namespace/demo-app-backend:latest",
+      "frontendReplicas": "2",
+      "backendReplicas": "2",
+      "executionMode": "simulate",
+      "updatedAt": "2026-04-01T13:28:56.256Z",
+      "lastAction": "deploy",
+      "status": "deployed",
+      "previousRelease": null
+    },
+    {
+      "key": "local-lab::staging::demo-app",
+      "appName": "demo-app",
+      "targetCluster": "local-lab",
+      "provider": "kubeadm",
+      "region": "local",
+      "environment": "staging",
+      "targetNamespace": "staging",
+      "kubeContext": "kubernetes-admin@homework-cluster",
+      "ingressHost": "demo-app.apps.local",
+      "imageTag": "web-console-demo",
+      "frontendImage": "docker.io/your-dockerhub-namespace/demo-app-frontend:web-console-demo",
+      "backendImage": "docker.io/your-dockerhub-namespace/demo-app-backend:web-console-demo",
+      "frontendReplicas": "2",
+      "backendReplicas": "2",
+      "executionMode": "simulate",
+      "updatedAt": "2026-04-01T10:18:32.136Z",
+      "lastAction": "deploy",
+      "status": "deployed",
+      "previousRelease": null
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-1775067207140-ac703f",
+      "type": "pod-delete",
+      "status": "completed",
+      "summary": "Delete pod demo-app-frontend-i5oxs-1 on ack-shanghai-prod/production",
+      "logs": [
+        "[web] received pod delete request for demo-app-frontend-i5oxs-1",
+        "[web] command template binding: Pod 删除模板",
+        "[simulate] would execute kubectl delete pod demo-app-frontend-i5oxs-1 -n production --context ack-shanghai-prod",
+        "[simulate] deployment controller would recreate the pod after deletion",
+        "[web] pod delete request saved for demo-app-frontend-i5oxs-1"
+      ],
+      "createdAt": "2026-04-01T18:13:27.140Z",
+      "finishedAt": "2026-04-01T18:13:27.140Z"
+    },
+    {
+      "id": "task-demo-release-update-platform-console",
+      "type": "release-action",
+      "status": "completed",
+      "summary": "update platform-console on homework-lab-shanghai/staging",
+      "logs": [
+        "[web] received update request for platform-console",
+        "[simulate] target cluster: homework-lab-shanghai",
+        "[simulate] target namespace: staging",
+        "[simulate] action: update",
+        "[simulate] rendered frontend and backend manifests",
+        "[simulate] prepared ingress host platform-console.apps.local",
+        "[simulate] would update both images and restart both deployments",
+        "[web] action update completed successfully"
+      ],
+      "createdAt": "2026-04-01T17:48:11.945Z",
+      "finishedAt": "2026-04-01T17:48:11.948Z"
+    },
+    {
+      "id": "task-demo-release-deploy-platform-console",
+      "type": "release-action",
+      "status": "completed",
+      "summary": "deploy platform-console on homework-lab-shanghai/staging",
+      "logs": [
+        "[web] received deploy request for platform-console",
+        "[simulate] target cluster: homework-lab-shanghai",
+        "[simulate] target namespace: staging",
+        "[simulate] action: deploy",
+        "[simulate] rendered frontend and backend manifests",
+        "[simulate] prepared ingress host platform-console.apps.local",
+        "[simulate] would apply frontend deployment/service and backend deployment/service",
+        "[web] action deploy completed successfully"
+      ],
+      "createdAt": "2026-04-01T17:21:44.659Z",
+      "finishedAt": "2026-04-01T17:21:44.661Z"
+    },
+    {
+      "id": "task-demo-ci-bind",
+      "type": "ci-code-source-bind",
+      "status": "completed",
+      "summary": "Bind gitlab repo demo-app-gitlab",
+      "logs": [
+        "[web] received CI code-source binding for demo-app-gitlab",
+        "[simulate] provider: gitlab",
+        "[simulate] repo: https://gitlab.example.com/group/demo-app.git",
+        "[simulate] pipeline file: jenkins/Jenkinsfile",
+        "[simulate] credentialId: gitlab-demo-token",
+        "[simulate] would create/update Jenkins job and webhook for demo-app-gitlab",
+        "[web] code-source binding saved successfully"
+      ],
+      "createdAt": "2026-04-01T17:21:44.640Z",
+      "finishedAt": "2026-04-01T17:21:44.640Z"
+    },
+    {
+      "id": "task-demo-onboard-cluster",
+      "type": "cluster-onboard",
+      "status": "completed",
+      "summary": "Onboard cluster homework-lab-shanghai",
+      "logs": [
+        "[web] onboarding cluster homework-lab-shanghai",
+        "[web] cluster homework-lab-shanghai is now available to the control plane"
+      ],
+      "createdAt": "2026-04-01T17:21:44.625Z",
+      "finishedAt": "2026-04-01T17:21:44.625Z"
+    },
+    {
+      "id": "task-demo-plan-cluster",
+      "type": "cluster-provision-plan",
+      "status": "completed",
+      "summary": "Plan cluster deployment homework-lab-shanghai",
+      "logs": [
+        "[web] received cluster deployment plan for homework-lab-shanghai",
+        "[simulate] control-plane node: 192.168.56.10",
+        "[simulate] worker nodes: 192.168.56.11, 192.168.56.12",
+        "[simulate] would render dynamic inventory and group_vars for homework-lab-shanghai",
+        "[simulate] would run ansible/playbooks/01-setup-cluster.yml",
+        "[simulate] would continue with Jenkins install and RBAC integration playbooks",
+        "[web] cluster deployment plan saved without persisting the raw SSH private key"
+      ],
+      "createdAt": "2026-04-01T17:21:44.549Z",
+      "finishedAt": "2026-04-01T17:21:44.549Z"
+    },
+    {
+      "id": "task-demo-release-deploy-local-demo-app",
+      "type": "release-action",
+      "status": "completed",
+      "summary": "deploy demo-app on local-lab/staging",
+      "logs": [
+        "[web] received deploy request for demo-app",
+        "[simulate] target cluster: local-lab",
+        "[simulate] target namespace: staging",
+        "[simulate] action: deploy",
+        "[simulate] rendered frontend and backend manifests",
+        "[simulate] prepared ingress host demo-app.apps.local",
+        "[simulate] would apply frontend deployment/service and backend deployment/service",
+        "[web] action deploy completed successfully"
+      ],
+      "createdAt": "2026-04-01T10:18:32.133Z",
+      "finishedAt": "2026-04-01T10:18:32.136Z"
+    }
+  ],
+  "clusterProvisions": [
+    {
+      "id": "plan-1775064104548-2d9b",
+      "name": "homework-lab-shanghai",
+      "mode": "kubeadm",
+      "controlPlaneIp": "192.168.56.10",
+      "workerNodeIps": [
+        "192.168.56.11",
+        "192.168.56.12"
+      ],
+      "sshUser": "ubuntu",
+      "sshPort": "22",
+      "sshKeyFingerprint": "3bcda90896c42f41",
+      "sshKeyProvided": true,
+      "podCidr": "192.168.0.0/16",
+      "kubernetesVersion": "1.29.6",
+      "installJenkins": true,
+      "notes": "Cluster plan created from web console",
+      "status": "planned",
+      "playbook": "ansible/playbooks/01-setup-cluster.yml",
+      "followUpPlaybooks": [
+        "ansible/playbooks/02-deploy-jenkins.yml",
+        "ansible/playbooks/03-integrate-jenkins-k8s.yml"
+      ],
+      "updatedAt": "2026-04-01T17:21:44.548Z"
+    }
+  ],
+  "codeSourceBindings": [
+    {
+      "id": "source-1775064104639-933b",
+      "bindingName": "demo-app-gitlab",
+      "provider": "gitlab",
+      "repoUrl": "https://gitlab.example.com/group/demo-app.git",
+      "namespaceGroup": "group",
+      "projectName": "demo-app",
+      "defaultBranch": "main",
+      "authMode": "token",
+      "credentialId": "gitlab-demo-token",
+      "webhookSecretMasked": "*************oken",
+      "registryUrl": "harbor.example.com",
+      "registryNamespace": "team-demo",
+      "pipelineKind": "full-stack",
+      "jenkinsfilePath": "jenkins/Jenkinsfile",
+      "autoTrigger": true,
+      "notes": "GitLab binding created from web console",
+      "status": "bound",
+      "updatedAt": "2026-04-01T17:21:44.639Z"
+    }
+  ],
+  "podActionRecords": [
+    {
+      "id": "pod-action-1775067207139-3061",
+      "action": "delete",
+      "releaseKey": "ack-shanghai-prod::production::demo-app",
+      "appName": "demo-app",
+      "targetCluster": "ack-shanghai-prod",
+      "targetNamespace": "production",
+      "podName": "demo-app-frontend-i5oxs-1",
+      "component": "frontend",
+      "templateId": "delete-pod",
+      "templateName": "Pod 删除模板",
+      "status": "deleted",
+      "updatedAt": "2026-04-01T18:13:27.139Z"
+    }
+  ]
+}

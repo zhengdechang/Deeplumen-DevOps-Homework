@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-frontend
+  namespace: ${TARGET_NAMESPACE}
+  labels:
+    app: ${APP_NAME}
+    component: frontend
+spec:
+  selector:
+    app: ${APP_NAME}
+    component: frontend
+  ports:
+    - name: http
+      port: ${FRONTEND_SERVICE_PORT}
+      targetPort: ${FRONTEND_PORT}

@@ -1,0 +1,1005 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevOps Platform Console</title>
+  <style>
+    :root {
+      --bg: #f3f7fb;
+      --surface: rgba(255, 255, 255, 0.92);
+      --surface-strong: #ffffff;
+      --text: #132238;
+      --muted: #6a7b92;
+      --line: rgba(19, 34, 56, 0.1);
+      --line-strong: rgba(19, 34, 56, 0.16);
+      --primary: #146fe3;
+      --primary-2: #0ba8ff;
+      --primary-soft: rgba(20, 111, 227, 0.1);
+      --ok: #1f9d62;
+      --warn: #d08a00;
+      --danger: #d14343;
+      --nav-1: #081423;
+      --nav-2: #10243d;
+      --nav-3: #16446f;
+      --shadow: 0 24px 70px rgba(12, 28, 49, 0.12);
+      --mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+      --sans: "IBM Plex Sans", "Segoe UI", "PingFang SC", sans-serif;
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --radius-md: 18px;
+      --radius-sm: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(20, 111, 227, 0.14), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(11, 168, 255, 0.12), transparent 24%),
+        linear-gradient(180deg, #fbfdff 0%, var(--bg) 100%);
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+    }
+
+    .shell {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 18px 18px 40px;
+    }
+
+    .console-shell {
+      display: grid;
+      grid-template-columns: 330px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .nav-shell {
+      position: sticky;
+      top: 18px;
+      min-height: calc(100vh - 36px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 22px 18px;
+      border-radius: var(--radius-xl);
+      color: #f2f8ff;
+      background:
+        radial-gradient(circle at top right, rgba(11, 168, 255, 0.18), transparent 26%),
+        linear-gradient(180deg, var(--nav-1) 0%, var(--nav-2) 56%, var(--nav-3) 100%);
+      box-shadow: 0 24px 70px rgba(8, 20, 35, 0.24);
+      overflow: hidden;
+    }
+
+    .nav-shell::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      bottom: -100px;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(11, 168, 255, 0.16), transparent 68%);
+      pointer-events: none;
+    }
+
+    .nav-brand,
+    .nav-badges,
+    .nav-menu,
+    .nav-foot {
+      position: relative;
+      z-index: 1;
+    }
+
+    .nav-brand {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .nav-mark {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font: 700 22px var(--mono);
+      background: linear-gradient(145deg, rgba(11, 168, 255, 0.34), rgba(20, 111, 227, 0.8));
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    }
+
+    .nav-brand h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .nav-brand p {
+      margin: 8px 0 0;
+      color: rgba(242, 248, 255, 0.68);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .nav-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .nav-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(146, 235, 255, 0.16);
+      background: rgba(11, 168, 255, 0.12);
+      color: #92ebff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .nav-menu {
+      display: grid;
+      gap: 14px;
+    }
+
+    .nav-group {
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+      transition: 0.18s ease;
+    }
+
+    .nav-group.is-active {
+      border-color: rgba(103, 192, 255, 0.24);
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-parent,
+    .nav-child {
+      width: 100%;
+      border: 1px solid transparent;
+      color: inherit;
+      background: transparent;
+      text-align: left;
+      transition: 0.18s ease;
+    }
+
+    .nav-parent {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) 18px;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .nav-parent:hover,
+    .nav-child:hover,
+    .action-button:hover,
+    .template-card:hover {
+      transform: translateY(-1px);
+    }
+
+    .nav-parent.is-active .nav-icon {
+      background: linear-gradient(135deg, rgba(20, 111, 227, 0.78), rgba(11, 168, 255, 0.56));
+      border-color: transparent;
+    }
+
+    .nav-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font: 700 14px var(--mono);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.09);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-copy strong {
+      display: block;
+      font-size: 15px;
+      color: #f2f8ff;
+    }
+
+    .nav-copy span {
+      display: block;
+      margin-top: 4px;
+      color: rgba(242, 248, 255, 0.64);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .nav-caret {
+      width: 10px;
+      height: 10px;
+      justify-self: center;
+      border-right: 2px solid rgba(242, 248, 255, 0.6);
+      border-bottom: 2px solid rgba(242, 248, 255, 0.6);
+      transform: rotate(45deg);
+      transition: transform 0.18s ease;
+    }
+
+    .nav-group.is-open .nav-caret {
+      transform: rotate(225deg);
+      margin-top: 6px;
+    }
+
+    .nav-children {
+      display: none;
+      gap: 8px;
+      padding: 0 14px 14px;
+    }
+
+    .nav-group.is-open .nav-children {
+      display: grid;
+    }
+
+    .nav-child {
+      padding: 12px 14px 12px 56px;
+      border-radius: 16px;
+      color: rgba(242, 248, 255, 0.78);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .nav-child.is-active {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(20, 111, 227, 0.22), rgba(11, 168, 255, 0.14));
+      border-color: rgba(103, 192, 255, 0.2);
+    }
+
+    .nav-foot {
+      margin-top: auto;
+      display: grid;
+      gap: 12px;
+    }
+
+    .nav-foot-note {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: rgba(242, 248, 255, 0.72);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .nav-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 10px;
+    }
+
+    .nav-stat {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-stat strong {
+      display: block;
+      font: 700 22px/1 var(--mono);
+      color: #fff;
+    }
+
+    .nav-stat span {
+      display: block;
+      margin-top: 8px;
+      color: rgba(242, 248, 255, 0.6);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .workspace-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .status-bar {
+      padding: 14px 16px;
+      border-radius: 16px;
+      min-height: 54px;
+      line-height: 1.6;
+      background: rgba(20, 111, 227, 0.08);
+      border: 1px solid rgba(20, 111, 227, 0.14);
+      color: #10345d;
+      box-shadow: var(--shadow);
+    }
+
+    .status-bar.tone-success {
+      background: rgba(31, 157, 98, 0.08);
+      border-color: rgba(31, 157, 98, 0.18);
+      color: #11603c;
+    }
+
+    .status-bar.tone-error {
+      background: rgba(209, 67, 67, 0.08);
+      border-color: rgba(209, 67, 67, 0.16);
+      color: #922f2f;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.is-active {
+      display: block;
+      animation: fade-in 0.18s ease;
+    }
+
+    .panel {
+      padding: 22px;
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(251, 253, 255, 0.9));
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .panel-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .tag,
+    .shortcut-chip,
+    .template-var,
+    .pill,
+    .switch-chip,
+    .rollout-chip,
+    .mini-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag,
+    .shortcut-chip,
+    .template-var,
+    .mini-chip {
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .table-shell {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    .console-table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: collapse;
+    }
+
+    .console-table th,
+    .console-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(19, 34, 56, 0.08);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    .console-table th {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(19, 34, 56, 0.03);
+    }
+
+    .console-table tbody tr:hover {
+      background: rgba(20, 111, 227, 0.035);
+    }
+
+    .table-link {
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: var(--primary);
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .table-link:hover {
+      text-decoration: underline;
+    }
+
+    .inline-actions,
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .actions {
+      margin-top: 16px;
+    }
+
+    .action-button {
+      padding: 11px 15px;
+      border-radius: 14px;
+      font-weight: 700;
+      transition: 0.18s ease;
+    }
+
+    .action-button.small {
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 12px;
+    }
+
+    .action-button.primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+      box-shadow: 0 10px 24px rgba(20, 111, 227, 0.14);
+    }
+
+    .action-button.secondary {
+      color: var(--primary);
+      background: rgba(20, 111, 227, 0.1);
+    }
+
+    .action-button.ghost {
+      color: var(--text);
+      background: rgba(19, 34, 56, 0.06);
+    }
+
+    .action-button.danger {
+      color: var(--danger);
+      background: rgba(209, 67, 67, 0.1);
+    }
+
+    .pill.ok,
+    .rollout-chip.ok {
+      color: var(--ok);
+      background: rgba(31, 157, 98, 0.1);
+    }
+
+    .pill.warn,
+    .rollout-chip.warn {
+      color: var(--warn);
+      background: rgba(208, 138, 0, 0.12);
+    }
+
+    .pill.danger,
+    .rollout-chip.danger {
+      color: var(--danger);
+      background: rgba(209, 67, 67, 0.1);
+    }
+
+    .empty {
+      padding: 28px 20px;
+      border-radius: 18px;
+      border: 1px dashed var(--line-strong);
+      background: linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(244, 248, 253, 0.92));
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    .form-grid,
+    .meta-grid,
+    .info-grid,
+    .group-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .form-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .meta-grid,
+    .info-grid {
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .field,
+    .kv-card,
+    .group-block,
+    .info-card,
+    .template-card {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.84));
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      padding: 0;
+      background: transparent;
+      border: none;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field label,
+    .check-row strong {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(248, 251, 255, 0.9);
+      color: var(--text);
+      outline: none;
+      transition: 0.18s ease;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: rgba(20, 111, 227, 0.34);
+      box-shadow: 0 0 0 4px rgba(20, 111, 227, 0.08);
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    input[type="file"] {
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .field-note,
+    .info-card p,
+    .detail-subtitle,
+    .helper-copy {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 13px;
+    }
+
+    .field-note code,
+    .helper-copy code,
+    .mono {
+      font-family: var(--mono);
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(248, 251, 255, 0.9);
+    }
+
+    .check-row input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+    }
+
+    .detail-hero,
+    .template-layout {
+      display: grid;
+      gap: 18px;
+    }
+
+    .detail-title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .detail-title-row h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .kv-card .k {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+
+    .kv-card .v {
+      display: block;
+      margin-top: 10px;
+      color: var(--text);
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .status-line,
+    .switch-line {
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-line strong,
+    .switch-line strong {
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .rollout-chips,
+    .switch-chips,
+    .template-vars {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .switch-chip {
+      color: var(--muted);
+      background: rgba(19, 34, 56, 0.06);
+    }
+
+    .switch-chip.on {
+      color: var(--primary);
+      background: rgba(20, 111, 227, 0.1);
+    }
+
+    .detail-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 6px;
+    }
+
+    .detail-tab {
+      padding: 10px 14px;
+      border-radius: 12px;
+      color: var(--muted);
+      background: rgba(19, 34, 56, 0.05);
+      border: 1px solid transparent;
+      font-weight: 700;
+    }
+
+    .detail-tab.is-active {
+      color: var(--primary);
+      background: rgba(20, 111, 227, 0.1);
+      border-color: rgba(20, 111, 227, 0.16);
+    }
+
+    .detail-panel {
+      display: none;
+    }
+
+    .detail-panel.is-active {
+      display: block;
+    }
+
+    .group-stack {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .group-block h3,
+    .info-card h3,
+    .template-card h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-top: 1px solid rgba(19, 34, 56, 0.06);
+    }
+
+    .field-row:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .field-row .name {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .field-row .value {
+      text-align: right;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .template-layout {
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .template-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .template-card {
+      width: 100%;
+      text-align: left;
+      transition: 0.18s ease;
+    }
+
+    .template-card.is-active {
+      border-color: rgba(20, 111, 227, 0.22);
+      box-shadow: 0 14px 30px rgba(20, 111, 227, 0.1);
+    }
+
+    .template-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .template-preview {
+      display: grid;
+      gap: 16px;
+    }
+
+    .code-preview {
+      margin: 0;
+      padding: 18px;
+      border-radius: 18px;
+      overflow: auto;
+      background: #0d1a2c;
+      color: #b8d5f4;
+      font: 13px/1.75 var(--mono);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .record-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .helper-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 1240px) {
+      .console-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-shell {
+        position: static;
+        min-height: auto;
+      }
+
+      .template-layout,
+      .group-stack,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        padding: 12px 12px 30px;
+      }
+
+      .panel,
+      .nav-shell {
+        border-radius: 22px;
+      }
+
+      .panel-head,
+      .detail-title-row {
+        flex-direction: column;
+      }
+
+      .nav-stats,
+      .meta-grid,
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .console-table {
+        min-width: 720px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="console-shell">
+      <aside class="nav-shell">
+        <div class="nav-brand">
+          <div class="nav-mark">OPS</div>
+          <div>
+            <h1>DevOps Platform Console</h1>
+            <p>围绕基础设施、集群纳管、CI-CD 与应用发布四个工作域，统一承接 Web 端操作。</p>
+          </div>
+        </div>
+
+        <div class="nav-badges">
+          <span class="nav-badge">Web First</span>
+          <span class="nav-badge">Multi Cloud</span>
+          <span class="nav-badge">Linux Ready</span>
+        </div>
+
+        <nav class="nav-menu" aria-label="DevOps platform navigation">
+          <div class="nav-group is-open" data-nav-group="infra">
+            <button class="nav-parent" type="button" data-section-trigger="infra" data-page-link="infra-cluster-deploy">
+              <span class="nav-icon">IF</span>
+              <span class="nav-copy">
+                <strong>基础设施</strong>
+                <span>承接 Linux 节点、kubeadm 集群和 Jenkins 安装规划。</span>
+              </span>
+              <span class="nav-caret" aria-hidden="true"></span>
+            </button>
+            <div class="nav-children">
+              <button class="nav-child" type="button" data-nav-page="infra-cluster-deploy" data-page-link="infra-cluster-deploy">集群部署</button>
+              <button class="nav-child" type="button" data-nav-page="infra-jenkins-install" data-page-link="infra-jenkins-install">Jenkins 安装</button>
+            </div>
+          </div>
+
+          <div class="nav-group" data-nav-group="cluster">
+            <button class="nav-parent" type="button" data-section-trigger="cluster" data-page-link="cluster-list">
+              <span class="nav-icon">CL</span>
+              <span class="nav-copy">
+                <strong>集群纳管</strong>
+                <span>面向多云集群的纳管工作区、Fleet 视图和运行状态。</span>
+              </span>
+              <span class="nav-caret" aria-hidden="true"></span>
+            </button>
+            <div class="nav-children">
+              <button class="nav-child" type="button" data-nav-page="cluster-list" data-page-link="cluster-list">纳管工作区</button>
+              <button class="nav-child" type="button" data-nav-page="cluster-node-pools" data-page-link="cluster-node-pools">Managed Fleet</button>
+            </div>
+          </div>
+
+          <div class="nav-group" data-nav-group="ci">
+            <button class="nav-parent" type="button" data-section-trigger="ci" data-page-link="ci-code-source">
+              <span class="nav-icon">CI</span>
+              <span class="nav-copy">
+                <strong>CI-CD</strong>
+                <span>管理代码源绑定、Jenkinsfile 路径、凭据和流水线入口。</span>
+              </span>
+              <span class="nav-caret" aria-hidden="true"></span>
+            </button>
+            <div class="nav-children">
+              <button class="nav-child" type="button" data-nav-page="ci-code-source" data-page-link="ci-code-source">代码源绑定</button>
+              <button class="nav-child" type="button" data-nav-page="ci-pipeline-center" data-page-link="ci-pipeline-center">流水线中心</button>
+            </div>
+          </div>
+
+          <div class="nav-group" data-nav-group="app">
+            <button class="nav-parent" type="button" data-section-trigger="app" data-page-link="app-list">
+              <span class="nav-icon">AP</span>
+              <span class="nav-copy">
+                <strong>应用发布</strong>
+                <span>沿用 PAE 风格的应用菜单、应用详情和指令模板工作流。</span>
+              </span>
+              <span class="nav-caret" aria-hidden="true"></span>
+            </button>
+            <div class="nav-children">
+              <button class="nav-child" type="button" data-nav-page="app-list" data-page-link="app-list">应用菜单</button>
+              <button class="nav-child" type="button" data-nav-page="app-detail" data-page-link="app-detail">应用详情</button>
+              <button class="nav-child" type="button" data-nav-page="cmd-template" data-page-link="cmd-template">指令模板</button>
+            </div>
+          </div>
+        </nav>
+
+        <div class="nav-foot">
+          <div class="nav-foot-note">
+            当前控制台已经从单一发布页扩展为完整的平台工作台。基础设施与 CI-CD 配置也可以通过 Web 端录入、保存和回看。
+          </div>
+          <div class="nav-stats">
+            <div class="nav-stat"><strong id="nav-app-count">0</strong><span>Apps</span></div>
+            <div class="nav-stat"><strong id="nav-cluster-count">0</strong><span>Clusters</span></div>
+            <div class="nav-stat"><strong id="nav-task-count">0</strong><span>Tasks</span></div>
+            <div class="nav-stat"><strong id="nav-provision-count">0</strong><span>Plans</span></div>
+            <div class="nav-stat"><strong id="nav-source-count">0</strong><span>CI</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="workspace-shell">
+        <div class="status-bar tone-info" id="status-bar">控制台已就绪，正在同步基础设施、集群、CI 和发布数据...</div>
+
+        <section class="page is-active" data-page="infra-cluster-deploy"><div id="infra-cluster-deploy-root"></div></section>
+        <section class="page" data-page="infra-jenkins-install"><div id="infra-jenkins-install-root"></div></section>
+        <section class="page" data-page="cluster-list"><div id="cluster-list-root"></div></section>
+        <section class="page" data-page="cluster-node-pools"><div id="cluster-node-pools-root"></div></section>
+        <section class="page" data-page="ci-code-source"><div id="ci-code-source-root"></div></section>
+        <section class="page" data-page="ci-pipeline-center"><div id="ci-pipeline-center-root"></div></section>
+        <section class="page" data-page="app-list"><div id="app-list-root"></div></section>
+        <section class="page" data-page="app-detail"><div id="app-detail-root"></div></section>
+        <section class="page" data-page="cmd-template"><div id="cmd-template-root"></div></section>
+      </section>
+    </section>
+  </main>
+  <script src="/pae-adapted.js"></script>
+</body>
+</html>
+

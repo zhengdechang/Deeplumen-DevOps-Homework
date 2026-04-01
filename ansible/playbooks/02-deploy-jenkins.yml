@@ -1,0 +1,7 @@
+---
+- name: Deploy Jenkins into the local Kubernetes cluster
+  hosts: k8s_master
+  become: true
+  roles:
+    - jenkins
+

@@ -1,0 +1,108 @@
+---
+- name: Ensure a temporary manifest directory exists on the control-plane node
+  ansible.builtin.file:
+    path: "{{ jenkins_manifest_output_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create the Jenkins namespace
+  ansible.builtin.command: kubectl create namespace {{ jenkins_namespace }}
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_namespace_create
+  failed_when: jenkins_namespace_create.rc != 0 and 'AlreadyExists' not in jenkins_namespace_create.stderr
+  changed_when: "'created' in jenkins_namespace_create.stdout"
+
+- name: Ensure the Jenkins service account exists before the Deployment starts
+  ansible.builtin.command: kubectl create serviceaccount jenkins -n {{ jenkins_namespace }}
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_sa_create
+  failed_when: jenkins_sa_create.rc != 0 and 'AlreadyExists' not in jenkins_sa_create.stderr and 'already exists' not in jenkins_sa_create.stderr
+  changed_when: "'created' in jenkins_sa_create.stdout"
+
+- name: Create the Jenkins PVC manifest
+  ansible.builtin.copy:
+    dest: "{{ jenkins_manifest_output_dir }}/jenkins-pvc.yml"
+    mode: "0644"
+    content: |
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: jenkins-home
+        namespace: {{ jenkins_namespace }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ jenkins_pvc_size }}
+
+- name: Render the Jenkins plugin ConfigMap manifest
+  ansible.builtin.template:
+    src: jenkins-plugins-configmap.yml.j2
+    dest: "{{ jenkins_manifest_output_dir }}/jenkins-plugins-configmap.yml"
+    mode: "0644"
+
+- name: Render the Jenkins initialization ConfigMap manifest
+  ansible.builtin.template:
+    src: jenkins-init-configmap.yml.j2
+    dest: "{{ jenkins_manifest_output_dir }}/jenkins-init-configmap.yml"
+    mode: "0644"
+
+- name: Render the Jenkins Deployment manifest
+  ansible.builtin.template:
+    src: jenkins-deployment.yml.j2
+    dest: "{{ jenkins_manifest_output_dir }}/jenkins-deployment.yml"
+    mode: "0644"
+
+- name: Render the Jenkins Service manifest
+  ansible.builtin.template:
+    src: jenkins-service.yml.j2
+    dest: "{{ jenkins_manifest_output_dir }}/jenkins-service.yml"
+    mode: "0644"
+
+- name: Apply the Jenkins PVC
+  ansible.builtin.command: kubectl apply -f {{ jenkins_manifest_output_dir }}/jenkins-pvc.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_pvc_apply
+  changed_when: "'created' in jenkins_pvc_apply.stdout or 'configured' in jenkins_pvc_apply.stdout"
+
+- name: Apply the Jenkins plugin ConfigMap
+  ansible.builtin.command: kubectl apply -f {{ jenkins_manifest_output_dir }}/jenkins-plugins-configmap.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_plugins_config_apply
+  changed_when: "'created' in jenkins_plugins_config_apply.stdout or 'configured' in jenkins_plugins_config_apply.stdout"
+
+- name: Apply the Jenkins initialization ConfigMap
+  ansible.builtin.command: kubectl apply -f {{ jenkins_manifest_output_dir }}/jenkins-init-configmap.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_init_config_apply
+  changed_when: "'created' in jenkins_init_config_apply.stdout or 'configured' in jenkins_init_config_apply.stdout"
+
+- name: Apply the Jenkins Deployment
+  ansible.builtin.command: kubectl apply -f {{ jenkins_manifest_output_dir }}/jenkins-deployment.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_deploy_apply
+  changed_when: "'created' in jenkins_deploy_apply.stdout or 'configured' in jenkins_deploy_apply.stdout"
+
+- name: Apply the Jenkins Service
+  ansible.builtin.command: kubectl apply -f {{ jenkins_manifest_output_dir }}/jenkins-service.yml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: jenkins_service_apply
+  changed_when: "'created' in jenkins_service_apply.stdout or 'configured' in jenkins_service_apply.stdout"
+
+- name: Wait for Jenkins rollout to complete
+  ansible.builtin.command: kubectl rollout status deployment/jenkins -n {{ jenkins_namespace }} --timeout=600s
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: false
+
+- name: Show the Jenkins access URL for the Linux lab cluster
+  ansible.builtin.debug:
+    msg: "Jenkins should be reachable on http://{{ ansible_default_ipv4.address }}:{{ jenkins_nodeport }}"

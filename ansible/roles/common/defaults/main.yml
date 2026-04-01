@@ -1,0 +1,15 @@
+---
+common_required_packages:
+  - apt-transport-https
+  - ca-certificates
+  - containerd
+  - curl
+  - git
+  - gnupg
+  - lsb-release
+  - python3-pip
+
+common_kernel_modules:
+  - overlay
+  - br_netfilter
+

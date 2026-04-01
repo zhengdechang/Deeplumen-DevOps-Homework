@@ -1,0 +1,7 @@
+---
+multicloud_required_tools:
+  - kubectl
+managed_cluster_bootstrap_namespaces:
+  - staging
+  - production
+

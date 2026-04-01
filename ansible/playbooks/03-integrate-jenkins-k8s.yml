@@ -1,0 +1,7 @@
+---
+- name: Configure Jenkins namespace access and RBAC
+  hosts: k8s_master
+  become: true
+  roles:
+    - jenkins_k8s
+

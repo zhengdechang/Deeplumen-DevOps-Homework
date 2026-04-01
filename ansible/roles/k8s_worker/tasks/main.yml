@@ -1,0 +1,48 @@
+---
+- name: Ensure the Kubernetes apt keyring directory exists on workers
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Install the Kubernetes package signing key on workers
+  ansible.builtin.shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | gpg --dearmor -o {{ k8s_worker_apt_keyring }}
+  args:
+    creates: "{{ k8s_worker_apt_keyring }}"
+
+- name: Configure the Kubernetes apt repository on workers
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    mode: "0644"
+    content: |
+      # Workers use the same repository channel as the control plane.
+      {{ k8s_worker_repo_line }}
+
+- name: Install worker packages with exact versions
+  ansible.builtin.apt:
+    name:
+      - "kubeadm={{ kubernetes_version }}"
+      - "kubelet={{ kubernetes_version }}"
+    state: present
+    update_cache: true
+
+- name: Hold worker packages to keep versions aligned with the control plane
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubeadm
+    - kubelet
+
+- name: Join the node to the cluster only if it has not joined before
+  ansible.builtin.command: "{{ hostvars[inventory_hostname].k8s_join_command }} --cri-socket unix:///run/containerd/containerd.sock"
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+
+- name: Ensure kubelet is enabled and running
+  ansible.builtin.service:
+    name: kubelet
+    enabled: true
+    state: started
+

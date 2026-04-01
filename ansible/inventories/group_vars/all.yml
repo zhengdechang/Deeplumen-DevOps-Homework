@@ -1,0 +1,40 @@
+---
+# A consistent timezone makes troubleshooting much easier across nodes and Jenkins jobs.
+system_timezone: Asia/Shanghai
+
+# Pin versions to keep repeatable builds and avoid accidental cluster upgrades.
+kubernetes_version: "1.29.6-1.1"
+helm_version: "3.15.4"
+
+# Calico works well across many bare-metal and cloud scenarios.
+pod_network_cidr: "192.168.0.0/16"
+default_cni: calico
+
+# Common name resolution for the lab environment.
+extra_hosts_entries:
+  - { ip: "192.168.56.10", name: "master-1" }
+  - { ip: "192.168.56.11", name: "worker-1" }
+  - { ip: "192.168.56.12", name: "worker-2" }
+
+# Jenkins deployment defaults for the local cluster mode.
+jenkins_namespace: jenkins
+jenkins_image: "jenkins/jenkins:lts-jdk17"
+jenkins_service_type: NodePort
+jenkins_nodeport: 32080
+jenkins_pvc_size: 20Gi
+
+# The path used by local provisioning tasks and by the onboarding playbook.
+multicloud_kubeconfig_path: "{{ lookup('env', 'HOME') }}/.kube/multi-cloud-config"
+
+# Registry defaults used by both Jenkins and the Kubernetes manifests.
+registry_url: docker.io
+registry_namespace: your-dockerhub-namespace
+registry_secret_name: regcred
+
+# Default application settings used by the release templates.
+default_app_port: 8080
+default_service_port: 80
+
+# The managed cluster registry is stored in a plain YAML file because it contains metadata, not secrets.
+managed_clusters_file: "{{ playbook_dir }}/../../clusters/managed-clusters.yml"
+

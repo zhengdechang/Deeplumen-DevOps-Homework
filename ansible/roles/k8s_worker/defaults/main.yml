@@ -1,0 +1,4 @@
+---
+k8s_worker_apt_keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+k8s_worker_repo_line: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /"
+

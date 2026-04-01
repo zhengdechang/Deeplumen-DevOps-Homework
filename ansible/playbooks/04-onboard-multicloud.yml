@@ -1,0 +1,7 @@
+---
+- name: Onboard existing domestic and overseas cloud Kubernetes clusters
+  hosts: control
+  become: false
+  roles:
+    - multicloud_onboard
+

@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: {{ jenkins_namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      # Keeping the service account explicit makes RBAC intent easier to audit.
+      serviceAccountName: jenkins
+      initContainers:
+        - name: install-jenkins-plugins
+          image: {{ jenkins_image }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              jenkins-plugin-cli
+              --plugin-file /var/jenkins_config/plugins.txt
+              --plugin-download-directory /var/jenkins_plugins
+          volumeMounts:
+            - name: jenkins-plugin-config
+              mountPath: /var/jenkins_config
+            - name: jenkins-plugins
+              mountPath: /var/jenkins_plugins
+      containers:
+        - name: jenkins
+          image: {{ jenkins_image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+            - containerPort: 50000
+          env:
+            # The init groovy script reads these variables to create the first admin account.
+            - name: JAVA_OPTS
+              value: "-Djenkins.install.runSetupWizard=false"
+            - name: JENKINS_ADMIN_ID
+              value: "{{ jenkins_admin_user }}"
+            - name: JENKINS_ADMIN_PASSWORD
+              value: "{{ jenkins_admin_password }}"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          volumeMounts:
+            - name: jenkins-home
+              mountPath: /var/jenkins_home
+            - name: jenkins-init
+              mountPath: /usr/share/jenkins/ref/init.groovy.d
+            - name: jenkins-plugins
+              mountPath: /usr/share/jenkins/ref/plugins
+      volumes:
+        - name: jenkins-home
+          persistentVolumeClaim:
+            claimName: jenkins-home
+        - name: jenkins-init
+          configMap:
+            name: jenkins-init-scripts
+        - name: jenkins-plugin-config
+          configMap:
+            name: jenkins-plugin-config
+        - name: jenkins-plugins
+          emptyDir: {}

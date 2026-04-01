@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}-backend
+  namespace: ${TARGET_NAMESPACE}
+  labels:
+    app: ${APP_NAME}
+    component: backend
+spec:
+  selector:
+    app: ${APP_NAME}
+    component: backend
+  ports:
+    - name: http
+      port: ${BACKEND_SERVICE_PORT}
+      targetPort: ${BACKEND_PORT}

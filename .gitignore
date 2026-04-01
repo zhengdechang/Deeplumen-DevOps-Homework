@@ -1,0 +1,13 @@
+# Local-only secrets and helper files.
+ansible/vault-password-file
+ansible/inventories/group_vars/all.yml.vault
+ansible/inventories/group_vars/multicloud.yml.vault
+
+# Typical local artifacts.
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+*.retry
+*.log
+apps/backend/node_modules/

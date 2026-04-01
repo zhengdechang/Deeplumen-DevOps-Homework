@@ -1,0 +1,93 @@
+---
+- name: Disable swap immediately because kubelet requires swap to be off in this reference design
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb | int > 0
+  changed_when: ansible_swaptotal_mb | int > 0
+
+- name: Comment out swap entries in fstab so reboot does not re-enable swap
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^(.*\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Ensure required kernel modules are configured to load on boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    mode: "0644"
+    content: |
+      # These modules are needed for bridged traffic visibility and overlay networking.
+      {% for item in common_kernel_modules %}
+      {{ item }}
+      {% endfor %}
+
+- name: Load required kernel modules immediately
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ common_kernel_modules }}"
+
+- name: Configure Linux kernel networking parameters for Kubernetes
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-kubernetes-cri.conf
+    mode: "0644"
+    content: |
+      # Allow iptables to see bridged traffic from pods and services.
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      # Allow the node to forward pod network traffic.
+      net.ipv4.ip_forward = 1
+  notify: Reload sysctl
+
+- name: Install base packages shared by control-plane and worker nodes
+  ansible.builtin.apt:
+    name: "{{ common_required_packages }}"
+    state: present
+    update_cache: true
+
+- name: Ensure containerd configuration directory exists
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: "0755"
+
+- name: Generate default containerd configuration for later patching
+  ansible.builtin.command: containerd config default
+  register: containerd_default_config
+  changed_when: false
+
+- name: Install containerd configuration using the systemd cgroup driver
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    mode: "0644"
+    content: "{{ containerd_default_config.stdout | regex_replace('SystemdCgroup = false', 'SystemdCgroup = true') }}"
+  notify: Restart containerd
+
+- name: Ensure containerd is enabled and running
+  ansible.builtin.service:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Set a consistent timezone for logs and scheduled jobs
+  community.general.timezone:
+    name: "{{ system_timezone }}"
+
+- name: Install chrony for reliable NTP synchronization
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: true
+
+- name: Ensure chrony is enabled and running
+  ansible.builtin.service:
+    name: chrony
+    enabled: true
+    state: started
+
+- name: Populate /etc/hosts with lab hostnames
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ item.ip }} {{ item.name }}"
+    state: present
+  loop: "{{ extra_hosts_entries }}"
+

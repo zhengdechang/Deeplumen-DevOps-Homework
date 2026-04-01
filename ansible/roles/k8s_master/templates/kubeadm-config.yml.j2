@@ -1,0 +1,12 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+clusterName: homework-cluster
+kubernetesVersion: v{{ kubernetes_version.split('-')[0] }}
+networking:
+  podSubnet: {{ pod_network_cidr }}
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: unix:///run/containerd/containerd.sock
+

@@ -1,0 +1,167 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'ACTION', choices: ['deploy', 'update', 'delete'], description: 'Select the lifecycle action.')
+        string(name: 'APP_NAME', defaultValue: 'demo-app', description: 'Application name used as the stack prefix.')
+        string(name: 'TARGET_CLUSTER', defaultValue: 'local-lab', description: 'Cluster registry name from clusters/managed-clusters.yml.')
+        string(name: 'TARGET_NAMESPACE', defaultValue: '', description: 'Optional override. Leave blank to use the cluster default namespace.')
+        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Container image tag to publish.')
+        string(name: 'FRONTEND_REPLICAS', defaultValue: '2', description: 'Frontend replica count.')
+        string(name: 'BACKEND_REPLICAS', defaultValue: '2', description: 'Backend replica count.')
+    }
+
+    environment {
+        REGISTRY_URL = 'docker.io'
+        REGISTRY_NAMESPACE = 'your-dockerhub-namespace'
+        FRONTEND_IMAGE_REPO = "${env.REGISTRY_URL}/${env.REGISTRY_NAMESPACE}/${params.APP_NAME}-frontend"
+        BACKEND_IMAGE_REPO = "${env.REGISTRY_URL}/${env.REGISTRY_NAMESPACE}/${params.APP_NAME}-backend"
+        MULTICLOUD_KUBECONFIG = credentials('multicloud-kubeconfig')
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (!(params.ACTION in ['deploy', 'update', 'delete'])) {
+                        error("Unsupported ACTION: ${params.ACTION}")
+                    }
+                    if (!params.APP_NAME?.trim()) {
+                        error('APP_NAME must not be empty.')
+                    }
+                    if (!params.TARGET_CLUSTER?.trim()) {
+                        error('TARGET_CLUSTER must not be empty.')
+                    }
+                }
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Resolve Target Cluster') {
+            steps {
+                script {
+                    def selectedCluster = selectClusterContext(
+                        clusterName: params.TARGET_CLUSTER,
+                        registryFile: 'clusters/managed-clusters.yml',
+                        namespaceOverride: params.TARGET_NAMESPACE
+                    )
+
+                    env.KUBE_CONTEXT = selectedCluster.kubeContext
+                    env.RELEASE_NAMESPACE = selectedCluster.releaseNamespace
+                    env.INGRESS_HOST = "${params.APP_NAME}.${selectedCluster.ingressDomainSuffix}"
+                    env.DEPLOY_ENV = selectedCluster.environment ?: 'unknown'
+                    env.CLUSTER_NAME = selectedCluster.name
+                    env.FRONTEND_PORT = '8080'
+                    env.BACKEND_PORT = '8080'
+                    env.FRONTEND_SERVICE_PORT = '80'
+                    env.BACKEND_SERVICE_PORT = '80'
+                    env.REGISTRY_SECRET_NAME = 'regcred'
+                }
+            }
+        }
+
+        stage('Build Frontend Image') {
+            when {
+                expression { params.ACTION != 'delete' }
+            }
+            steps {
+                sh '''
+                    # Build the standalone frontend image.
+                    docker build -t "${FRONTEND_IMAGE_REPO}:${IMAGE_TAG}" -f docker/frontend.Dockerfile .
+                '''
+            }
+        }
+
+        stage('Build Backend Image') {
+            when {
+                expression { params.ACTION != 'delete' }
+            }
+            steps {
+                sh '''
+                    # Build the backend API image.
+                    docker build -t "${BACKEND_IMAGE_REPO}:${IMAGE_TAG}" -f docker/backend.Dockerfile .
+                '''
+            }
+        }
+
+        stage('Push Images') {
+            when {
+                expression { params.ACTION != 'delete' }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'registry-creds', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                    sh '''
+                        echo "${REG_PASS}" | docker login "${REGISTRY_URL}" --username "${REG_USER}" --password-stdin
+                        docker push "${FRONTEND_IMAGE_REPO}:${IMAGE_TAG}"
+                        docker push "${BACKEND_IMAGE_REPO}:${IMAGE_TAG}"
+                    '''
+                }
+            }
+        }
+
+        stage('Publish Full Stack') {
+            steps {
+                script {
+                    deployToK8s(
+                        action: params.ACTION,
+                        appName: params.APP_NAME,
+                        kubeconfigPath: env.MULTICLOUD_KUBECONFIG,
+                        kubeContext: env.KUBE_CONTEXT,
+                        namespace: env.RELEASE_NAMESPACE,
+                        clusterName: env.CLUSTER_NAME,
+                        deployEnv: env.DEPLOY_ENV,
+                        appVersion: params.IMAGE_TAG,
+                        frontendImage: "${env.FRONTEND_IMAGE_REPO}:${params.IMAGE_TAG}",
+                        backendImage: "${env.BACKEND_IMAGE_REPO}:${params.IMAGE_TAG}",
+                        frontendReplicas: params.FRONTEND_REPLICAS,
+                        backendReplicas: params.BACKEND_REPLICAS,
+                        frontendPort: env.FRONTEND_PORT,
+                        backendPort: env.BACKEND_PORT,
+                        frontendServicePort: env.FRONTEND_SERVICE_PORT,
+                        backendServicePort: env.BACKEND_SERVICE_PORT,
+                        ingressHost: env.INGRESS_HOST,
+                        registrySecretName: env.REGISTRY_SECRET_NAME
+                    )
+                }
+            }
+        }
+
+        stage('Health Check') {
+            when {
+                expression { params.ACTION != 'delete' }
+            }
+            steps {
+                sh '''
+                    kubectl --kubeconfig "${MULTICLOUD_KUBECONFIG}" --context "${KUBE_CONTEXT}" \
+                      rollout status "deployment/${APP_NAME}-frontend" -n "${RELEASE_NAMESPACE}" --timeout=180s
+                    kubectl --kubeconfig "${MULTICLOUD_KUBECONFIG}" --context "${KUBE_CONTEXT}" \
+                      rollout status "deployment/${APP_NAME}-backend" -n "${RELEASE_NAMESPACE}" --timeout=180s
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Full-stack release succeeded for ${params.APP_NAME} on ${params.TARGET_CLUSTER}."
+        }
+        failure {
+            script {
+                if (params.ACTION == 'update') {
+                    k8sRollback(
+                        appName: params.APP_NAME,
+                        kubeconfigPath: env.MULTICLOUD_KUBECONFIG,
+                        kubeContext: env.KUBE_CONTEXT,
+                        namespace: env.RELEASE_NAMESPACE
+                    )
+                }
+            }
+            echo 'Release failed. Review the build, push, rollout, and ingress logs.'
+        }
+    }
+}

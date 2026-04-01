@@ -1,0 +1,19 @@
+---
+- name: Prepare all Linux nodes for Kubernetes
+  hosts: all:!control
+  become: true
+  roles:
+    - common
+
+- name: Initialize the Kubernetes control plane
+  hosts: k8s_master
+  become: true
+  roles:
+    - k8s_master
+
+- name: Join workers to the Kubernetes cluster
+  hosts: k8s_worker
+  become: true
+  roles:
+    - k8s_worker
+

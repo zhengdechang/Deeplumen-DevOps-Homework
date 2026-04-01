@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-init-scripts
+  namespace: {{ jenkins_namespace }}
+data:
+  basic-security.groovy: |
+    import hudson.security.FullControlOnceLoggedInAuthorizationStrategy
+    import hudson.security.HudsonPrivateSecurityRealm
+    import jenkins.install.InstallState
+    import jenkins.model.Jenkins
+
+    def instance = Jenkins.get()
+    def env = System.getenv()
+    def adminUsername = env['JENKINS_ADMIN_ID'] ?: 'admin'
+    def adminPassword = env['JENKINS_ADMIN_PASSWORD'] ?: 'ChangeMe-Immediately'
+
+    // Create a local admin account on the first startup so the demo remains fully automated.
+    if (!(instance.getSecurityRealm() instanceof HudsonPrivateSecurityRealm) || instance.getSecurityRealm().getAllUsers().isEmpty()) {
+      def realm = new HudsonPrivateSecurityRealm(false)
+      if (realm.getUser(adminUsername) == null) {
+        realm.createAccount(adminUsername, adminPassword)
+      }
+      instance.setSecurityRealm(realm)
+
+      def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+      strategy.setAllowAnonymousRead(false)
+      instance.setAuthorizationStrategy(strategy)
+      instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)
+      instance.save()
+    }

@@ -1,0 +1,9 @@
+---
+# This file stores sensitive paths or credentials related to external cluster onboarding.
+# Do not commit the decrypted version.
+vault_multicloud_kubeconfig_source: "/secure/path/to/merged-multicloud-kubeconfig"
+vault_allowed_cluster_names:
+  - ack-shanghai-prod
+  - cce-beijing-staging
+  - eks-us-east-1-prod
+

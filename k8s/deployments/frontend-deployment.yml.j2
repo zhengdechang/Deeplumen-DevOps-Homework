@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}-frontend
+  namespace: ${TARGET_NAMESPACE}
+  labels:
+    app: ${APP_NAME}
+    component: frontend
+spec:
+  replicas: ${FRONTEND_REPLICAS}
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+      component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}
+        component: frontend
+    spec:
+      imagePullSecrets:
+        - name: ${REGISTRY_SECRET_NAME}
+      containers:
+        - name: frontend
+          image: ${FRONTEND_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: ${FRONTEND_PORT}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: ${FRONTEND_PORT}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: ${FRONTEND_PORT}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
