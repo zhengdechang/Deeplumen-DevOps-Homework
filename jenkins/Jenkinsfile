@@ -110,8 +110,9 @@ spec:
                                   --cleanup
                             """
                         } catch (Exception e) {
-                            echo "构建失败，开始锁定 Pod 供调试 (30分钟)..."
-                            sh "sleep 1800000"  // 报错后 Pod 不会消失，等待 30 分钟
+                            echo "构建失败."
+                            // echo "构建失败，开始锁定 Pod 供调试 (30分钟)..."
+                            // sh "sleep 1800"  // 报错后 Pod 不会消失，等待 30 分钟
                             throw e
                         }
                     }
