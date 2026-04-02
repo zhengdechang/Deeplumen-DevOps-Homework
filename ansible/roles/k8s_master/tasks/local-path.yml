@@ -1,0 +1,41 @@
+---
+- name: 下载 Local Path Provisioner 部署文件
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml
+    dest: /tmp/local-path-storage.yaml
+    validate_certs: false  # 针对 CentOS 7 的旧版 SSL 证书问题
+
+- name: 部署 Local Path Provisioner
+  ansible.builtin.shell: "kubectl apply -f /tmp/local-path-storage.yaml"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  args:
+    # 幂等性：如果已经存在该 deployment，则跳过
+    creates: /var/lib/local_path_provisioner_applied
+
+- name: 标记 Local Path 已部署
+  ansible.builtin.file:
+    path: /var/lib/local_path_provisioner_applied
+    state: touch
+
+- name: 设置 local-path 为默认存储类 (StorageClass)
+  ansible.builtin.shell: |
+    kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  changed_when: false
+
+- name: 等待 local-path StorageClass 出现
+  ansible.builtin.shell: "kubectl get sc local-path"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: sc_check
+  until: sc_check.rc == 0
+  retries: 10
+  delay: 5
+  changed_when: false
+
+- name: 标记 Local Path 已就绪
+  ansible.builtin.file:
+    path: /var/lib/ansible_local_path_applied
+    state: touch

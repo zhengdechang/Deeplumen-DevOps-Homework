@@ -1,0 +1,14 @@
+- name: 准备基础环境
+  hosts: all
+  roles:
+    - common
+
+- name: 初始化 Kubernetes Master
+  hosts: masters
+  roles:
+    - k8s_master
+
+- name: 加入 Kubernetes Worker
+  hosts: workers
+  roles:
+    - k8s_worker

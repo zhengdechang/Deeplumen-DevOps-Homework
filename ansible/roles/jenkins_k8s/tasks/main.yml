@@ -1,0 +1,63 @@
+- name: 部署 Jenkins Cloud 管理权限 (sa & Role & RoleBinding)
+  ansible.builtin.shell: |
+    kubectl apply -f - <<EOF
+    {{ lookup('template', item) }}
+    EOF
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  loop:
+    - jenkins-sa.yml.j2
+    - jenkins-rbac.yml.j2
+  register: cloud_rbac_out
+  changed_when: "'configured' in cloud_rbac_out.stdout or 'created' in cloud_rbac_out.stdout"
+
+- name: 获取 Jenkins SA Token
+  ansible.builtin.shell: |
+    kubectl get secret jenkins-sa-token -n jenkins -o jsonpath='{.data.token}' | base64 -d
+  register: jenkins_sa_token
+  changed_when: false
+
+- name: 获取 K8s API Server 地址
+  ansible.builtin.shell: |
+    # 使用 sed 彻底过滤掉 ANSI 颜色转义字符
+    kubectl cluster-info | grep 'Kubernetes control plane' | awk '{print $NF}' | sed 's/\x1b\[[0-9;]*m//g'
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: k8s_api_url
+  changed_when: false
+
+- name: 获取 CSRF Crumb
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ jenkins_node_port }}/crumbIssuer/api/json"
+    user: "admin"
+    password: "{{ vault_jenkins_admin_password }}"
+    force_basic_auth: yes
+    return_content: yes
+  register: jenkins_crumb
+
+- name: 携带 Crumb 发送配置请求
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ jenkins_node_port }}/scriptText"
+    method: POST
+    user: "admin"
+    password: "{{ vault_jenkins_admin_password }}"
+    force_basic_auth: yes
+    body_format: form-urlencoded
+    headers:
+      Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
+      Cookie: "{{ jenkins_crumb.set_cookie }}"
+    body:
+      script: "{{ lookup('template', 'configure-k8s-cloud.groovy.j2') }}"
+
+- name: 创建镜像仓库加密 Secret (regcred)
+  ansible.builtin.shell: |
+    kubectl create secret docker-registry regcred \
+      --docker-server="{{ vault_docker_registry_server }}" \
+      --docker-username="{{ vault_docker_registry_user }}" \
+      --docker-password="{{ vault_docker_registry_password }}" \
+      --namespace=jenkins \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: regcred_out
+  changed_when: "'created' in regcred_out.stdout or 'configured' in regcred_out.stdout"

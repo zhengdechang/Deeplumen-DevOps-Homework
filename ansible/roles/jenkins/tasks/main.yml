@@ -1,0 +1,28 @@
+- name: 创建 Jenkins 命名空间
+  ansible.builtin.shell: "kubectl create namespace jenkins"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: ns_out
+  failed_when: false
+  changed_when: "ns_out.rc == 0"
+
+- name: 渲染 Jenkins Values 模板
+  ansible.builtin.template:
+    src: jenkins-values.yaml.j2
+    dest: /tmp/jenkins-values.yaml
+
+- name: 添加并更新 Jenkins Helm 仓库
+  ansible.builtin.shell: |
+    helm repo add jenkins https://charts.jenkins.io
+    helm repo update
+  changed_when: false
+
+- name: 使用 Helm 安装 Jenkins
+  ansible.builtin.shell: |
+    helm upgrade --install jenkins jenkins/jenkins \
+      --namespace jenkins \
+      --values /tmp/jenkins-values.yaml \
+      --wait --timeout 10m
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: helm_result

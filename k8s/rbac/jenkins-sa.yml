@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-deployer
+  namespace: jenkins
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jenkins-deployer-secret
+  namespace: jenkins
+  annotations:
+    kubernetes.io/service-account.name: jenkins-deployer
+type: kubernetes.io/service-account-token

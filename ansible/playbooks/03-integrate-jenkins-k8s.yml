@@ -1,0 +1,6 @@
+- name: 创建 Jenkins k8s sa 并集成kubernetes
+  hosts: masters
+  vars_files:
+    - /root/project/ansible/inventories/group_vars/vault.yml
+  roles:
+    - jenkins_k8s

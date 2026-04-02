@@ -1,0 +1,15 @@
+- name: 检查节点是否已经加入集群
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: 执行加入集群命令
+  ansible.builtin.command:
+    cmd: "{{ k8s_join_command }} --cri-socket unix:///run/containerd/containerd.sock"
+  when: not kubelet_conf.stat.exists
+  register: worker_join
+
+- name: 打印加入结果
+  ansible.builtin.debug:
+    msg: "{{ worker_join.stdout }}"
+  when: worker_join.changed

@@ -1,0 +1,159 @@
+@Library('k8s_deploy') _
+
+pipeline {
+agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  securityContext:
+    runAsUser: 1000  # 或者与镜像匹配的用户 ID
+    fsGroup: 1000
+  serviceAccountName: jenkins-deployer
+  containers:
+  - name: kaniko
+    image: gcr.io/kaniko-project/executor:debug
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh", "-c", "tail -f /dev/null"]
+    securityContext:
+      runAsUser: 0  # 强制使用 root 执行构建
+    volumeMounts:
+    - name: kaniko-secret
+      mountPath: /kaniko/.docker
+  volumes:
+  - name: kaniko-secret
+    projected:
+      sources:
+      - secret:
+          name: regcred  # 你的镜像仓库登录凭证 Secret
+          items:
+            - key: .dockerconfigjson
+              path: config.json
+"""
+        }
+    }
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        GIT_REPO_BASE = 'https://github.com/bebc'
+        IMAGE_REGISTRY_BASE = 'registry.cn-hangzhou.aliyuncs.com/bebc'
+    }
+
+    parameters {
+        choice(name: 'ACTION', choices: ['deploy', 'update', 'delete'], description: 'K8s lifecycle action')
+        choice(name: 'LANGUAGE', choices: ['golang', 'java', 'nodejs'], description: 'Application language type')
+        string(name: 'APP_NAME', defaultValue: 'demo-app', description: 'Application name')
+        string(name: 'APP_BRANCH', defaultValue: 'main', description: 'App repository branch')
+        choice(name: 'NAMESPACE', choices: ['staging', 'production'], description: 'Target namespace')
+        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Image tag')
+        string(name: 'REPLICAS', defaultValue: '2', description: 'Replica count for deploy')
+        string(name: 'DEPLOY_JOB', defaultValue: 'deploy-pipeline', description: 'Downstream deployment job name (uses jenkins/Jenkinsfile.deploy)')
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (!(params.APP_NAME ==~ /^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$/)) {
+                        error('APP_NAME must be a valid DNS-1123 label')
+                    }
+                    if (!(params.REPLICAS ==~ /^[0-9]+$/)) {
+                        error('REPLICAS must be a non-negative integer')
+                    }
+                    if (!(params.IMAGE_TAG ==~ /^[A-Za-z0-9_.-]+$/)) {
+                        error('IMAGE_TAG contains invalid characters')
+                    }
+                    if (!(params.APP_BRANCH ==~ /^[A-Za-z0-9._\/-]+$/)) {
+                        error('APP_BRANCH contains invalid characters')
+                    }
+                    if (!['golang', 'java', 'nodejs'].contains(params.LANGUAGE)) {
+                        error('LANGUAGE must be one of golang|java|nodejs')
+                    }
+                    env.IMAGE_URI = "${env.IMAGE_REGISTRY_BASE}/${params.APP_NAME}:${params.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Checkout Repositories') {
+            when {
+                expression { params.ACTION != 'delete' }
+            }
+            steps {
+                checkout scm
+                dir('app') {
+                    deleteDir()
+                    git branch: params.APP_BRANCH, url: "${env.GIT_REPO_BASE}/${params.APP_NAME}.git"
+                }
+                echo "Checked out app repository: github.com/bebc/${params.APP_NAME}, branch=${params.APP_BRANCH}"
+            }
+        }
+
+        stage('Build & Push Image') {
+            when {
+                expression { params.ACTION != 'delete' }
+            }
+            steps {
+                container('kaniko') {
+                    script {
+                        try {
+                             sh """
+                                /kaniko/executor \
+                                  --context "${WORKSPACE}/app" \
+                                  --dockerfile "${WORKSPACE}/docker/dockerfile-${params.LANGUAGE}" \
+                                  --destination "${IMAGE_URI}" \
+                                  --build-arg APP_NAME_ARG="${params.APP_NAME}" \
+                                  --single-snapshot \
+                                  --cleanup
+                            """
+                        } catch (Exception e) {
+                            echo "构建失败."
+                            // echo "构建失败，开始锁定 Pod 供调试 (30分钟)..."
+                            // sh "sleep 1800"  // 报错后 Pod 不会消失，等待 30 分钟
+                            throw e
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Trigger Deploy Pipeline') {
+            steps {
+                script {
+                    build job: params.DEPLOY_JOB,
+                        wait: true,
+                        propagate: true,
+                        parameters: [
+                            string(name: 'ACTION', value: params.ACTION),
+                            string(name: 'APP_NAME', value: params.APP_NAME),
+                            string(name: 'NAMESPACE', value: params.NAMESPACE),
+                            string(name: 'IMAGE_TAG', value: params.IMAGE_TAG),
+                            string(name: 'IMAGE_URI', value: env.IMAGE_URI),
+                            string(name: 'REPLICAS', value: params.REPLICAS)
+                        ]
+                }
+            }
+        }
+
+        stage('Result') {
+            steps {
+                echo "Action=${params.ACTION}, Language=${params.LANGUAGE}, App=${params.APP_NAME}, Namespace=${params.NAMESPACE}, ImageTag=${params.IMAGE_TAG} completed."
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build pipeline finished successfully and deployment pipeline completed.'
+        }
+        failure {
+            echo 'Build or downstream deploy pipeline failed. Check stage logs for details.'
+        }
+        always {
+            echo 'Notification placeholder: integrate Slack/Email/DingTalk here.'
+        }
+    }
+}

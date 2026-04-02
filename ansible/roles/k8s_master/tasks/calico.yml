@@ -1,0 +1,30 @@
+---
+- name: 下载 Tigera Operator 资源文件
+  ansible.builtin.shell: "curl -L -o /tmp/tigera-operator.yaml https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/tigera-operator.yaml"
+  args:
+    creates: /tmp/tigera-operator.yaml
+
+- name: 下载 Calico 自定义资源文件
+  ansible.builtin.shell: "curl -L -o /tmp/custom-resources.yaml https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/custom-resources.yaml"
+  args:
+    creates: /tmp/custom-resources.yaml
+
+- name: 修改 Calico 网段以匹配 podSubnet (172.25.0.0/16)
+  ansible.builtin.replace:
+    path: /tmp/custom-resources.yaml
+    regexp: 'cidr: 192\.168\.0\.0/16'
+    replace: 'cidr: {{ pod_network_cidr }}'
+
+- name: 应用 Tigera Operator
+  ansible.builtin.shell: "kubectl apply -f /tmp/tigera-operator.yaml --server-side"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: 等待 Operator 启动 (约 10 秒)
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: 应用 Calico 自定义资源
+  ansible.builtin.shell: "kubectl apply -f /tmp/custom-resources.yaml"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf

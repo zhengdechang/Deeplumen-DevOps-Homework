@@ -1,0 +1,14 @@
+controller:
+  componentName: "jenkins-controller"
+  admin:
+      password: "{{ vault_jenkins_admin_password }}"
+  serviceType: NodePort
+  nodePort: {{ jenkins_node_port | default(32000) }}
+  installPlugins:
+    - kubernetes:4423.vb_59f230b_ce53
+    - workflow-aggregator:596.v8c21c963d92d
+    - git:5.2.1
+persistence:
+  enabled: true
+  storageClass: "local-path"
+  size: "{{ jenkins_storage_size | default('10Gi') }}"

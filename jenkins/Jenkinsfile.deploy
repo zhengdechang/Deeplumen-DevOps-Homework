@@ -1,0 +1,109 @@
+@Library('k8s_deploy') _
+
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins-deployer
+  securityContext:
+    runAsUser: 0
+    fsGroup: 0
+  containers:
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh", "-c", "tail -f /dev/null"]
+    securityContext:
+      runAsUser: 0 # 调试期间建议先统一成 root 排除权限干扰
+"""
+        }
+    }
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        choice(name: 'ACTION', choices: ['deploy', 'update', 'delete'], description: 'K8s lifecycle action')
+        string(name: 'APP_NAME', defaultValue: 'demo-app', description: 'Application name')
+        choice(name: 'NAMESPACE', choices: ['staging', 'production'], description: 'Target namespace')
+        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Image tag')
+        string(name: 'IMAGE_URI', defaultValue: '', description: 'Full image URI, e.g. registry/repo/app:tag')
+        string(name: 'REPLICAS', defaultValue: '2', description: 'Replica count for deploy')
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (!(params.APP_NAME ==~ /^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$/)) {
+                        error('APP_NAME must be a valid DNS-1123 label')
+                    }
+                    if (!(params.IMAGE_TAG ==~ /^[A-Za-z0-9_.-]+$/)) {
+                        error('IMAGE_TAG contains invalid characters')
+                    }
+                    if (!(params.REPLICAS ==~ /^[0-9]+$/)) {
+                        error('REPLICAS must be a non-negative integer')
+                    }
+
+                    env.EFFECTIVE_IMAGE_URI = params.IMAGE_URI?.trim()
+                        ? params.IMAGE_URI.trim()
+                        : "registry.cn-hangzhou.aliyuncs.com/bebc/${params.APP_NAME}:${params.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Production Approval') {
+            when {
+                expression { params.NAMESPACE == 'production' }
+            }
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input(
+                        message: "Approve ${params.ACTION} for ${params.APP_NAME} to production?",
+                        ok: 'Approve and Deploy'
+                    )
+                }
+            }
+        }
+
+        stage('K8s Lifecycle Operation') {
+            steps {
+                container('kubectl') {
+                    deployToK8S(
+                        action: params.ACTION,
+                        appName: params.APP_NAME,
+                        namespace: params.NAMESPACE,
+                        imageTag: params.IMAGE_TAG,
+                        imageUri: env.EFFECTIVE_IMAGE_URI,
+                        replicas: params.REPLICAS,
+                        kubectlBin: 'kubectl'
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deploy pipeline finished successfully.'
+        }
+        failure {
+            script {
+                if (params.ACTION != 'delete') {
+                    container('kubectl') {
+                        k8sRollback(
+                            appName: params.APP_NAME,
+                            namespace: params.NAMESPACE,
+                            kubectlBin: 'kubectl'
+                        )
+                    }
+                }
+            }
+            echo "Deploy pipeline failed. Rollback attempted for ${params.APP_NAME} in ${params.NAMESPACE}."
+        }
+    }
+}

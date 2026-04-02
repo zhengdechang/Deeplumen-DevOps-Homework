@@ -1,0 +1,11 @@
+---
+# Add handlers here as role tasks evolve.
+- name: restart containerd
+  ansible.builtin.service:
+    name: containerd
+    state: restarted
+
+- name: restart chronyd
+  ansible.builtin.service:
+    name: chronyd
+    state: restarted

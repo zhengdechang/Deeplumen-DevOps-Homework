@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ APP_NAME }}
+  namespace: {{ NAMESPACE }}
+  labels:
+    app: {{ APP_NAME }}
+spec:
+  replicas: {{ REPLICAS }}
+{{ STRATEGY_BLOCK }}
+  selector:
+    matchLabels:
+      app: {{ APP_NAME }}
+  template:
+    metadata:
+      labels:
+        app: {{ APP_NAME }}
+    spec:
+      containers:
+      - name: {{ APP_NAME }}
+        image: {{ IMAGE_URI }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

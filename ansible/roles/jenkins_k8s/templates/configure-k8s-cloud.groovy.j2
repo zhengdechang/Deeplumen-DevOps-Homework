@@ -1,0 +1,36 @@
+import jenkins.model.*
+import org.csanchez.jenkins.plugins.kubernetes.*
+import com.cloudbees.plugins.credentials.*
+import com.cloudbees.plugins.credentials.domains.*
+import com.cloudbees.plugins.credentials.impl.*
+import org.jenkinsci.plugins.plaincredentials.impl.*
+import hudson.util.Secret
+
+def jenkins = Jenkins.getInstance()
+def k8sToken = "{{ jenkins_sa_token.stdout }}"
+def k8sApiUrl = "{{ k8s_api_url.stdout }}"
+def credentialsId = "k8s-token-auth"
+
+// 1. 注册 Token 到 Jenkins 凭据系统
+def domain = Domain.global()
+def store = jenkins.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
+def apiToken = new StringCredentialsImpl(
+    CredentialsScope.GLOBAL,
+    credentialsId,
+    "Kubernetes SA Token",
+    Secret.fromString(k8sToken)
+)
+store.addCredentials(domain, apiToken)
+
+// 2. 配置 Kubernetes Cloud
+def k8sCloud = new KubernetesCloud("kubernetes")
+k8sCloud.setServerUrl(k8sApiUrl)
+k8sCloud.setNamespace("jenkins")
+k8sCloud.setCredentialsId(credentialsId)
+k8sCloud.setSkipTlsVerify(true) // 如果是自签名证书，建议设为 true
+
+// 替换或添加配置
+jenkins.clouds.clear()
+jenkins.clouds.add(k8sCloud)
+jenkins.save()
+println "Success: Kubernetes cloud configured."

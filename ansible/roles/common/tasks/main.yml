@@ -1,0 +1,128 @@
+---
+- name: Install base dependencies
+  ansible.builtin.package:
+    name:
+      - curl
+      - vim
+      - git
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: present
+
+- name: Ensure swap is disabled immediately
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb > 0  # 只有当前 swap 大于 0 时才执行
+  changed_when: false
+
+- name: forbidden swap mount
+  ansible.builtin.mount:
+    name: "none"
+    fstype: "swap"
+    state: absent  # 这会直接从 fstab 中移除 swap 条目
+
+- name: Set system timezone
+  ansible.builtin.timezone:
+    name: Asia/Shanghai
+
+- name: Ensure NTP package is installed
+  ansible.builtin.package:
+    name: chrony
+    state: present
+
+- name: Ensure chrony service is enabled and running
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: 修改 Chrony 配置文件使用国内 NTP 源
+  ansible.builtin.copy:
+    dest: /etc/chrony.conf
+    content: |
+      # 使用阿里云和腾讯云的 NTP 服务器
+      server ntp.aliyun.com iburst
+      server ntp.tencent.com iburst
+      server cn.pool.ntp.org iburst
+      
+      # 记录系统时钟偏差
+      driftfile /var/lib/chrony/drift
+      
+      # 允许在前三次更新中通过步进（step）方式修正超过 1 秒的偏差
+      makestep 1.0 3
+      
+      # 启用实时时钟同步
+      rtcsync
+      
+      # 日志配置
+      logdir /var/log/chrony
+    mode: '0644'
+  notify: restart chronyd
+
+- name: 确保 chronyd 服务启动并立即刷新
+  ansible.builtin.meta: flush_handlers
+
+- name: 强制执行一次手动步进同步
+  ansible.builtin.command: chronyc -a makestep
+  changed_when: false
+
+- name: 配置 Kubernetes 阿里云镜像源
+  ansible.builtin.yum_repository:
+    name: kubernetes
+    description: Kubernetes Aliyun Repo
+    baseurl: https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
+    enabled: yes
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    gpgkey:
+      - https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg
+      - https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+
+- name: 添加 Docker CE 软件源 (包含 containerd)
+  ansible.builtin.get_url:
+    url: https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: '0644'
+
+- name: 安装 containerd.io
+  ansible.builtin.yum:
+    name: containerd.io
+    state: present
+    update_cache: yes
+
+- name: 确保 containerd 配置目录存在
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+
+- name: 分发 containerd 配置文件
+  ansible.builtin.template:
+    src: containerd.config.toml.j2
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart containerd
+
+- name: 启动并启用 containerd 服务
+  ansible.builtin.service:
+    name: containerd
+    state: started
+    enabled: yes
+
+- name: 安装 Kubernetes 核心组件 (kubelet, kubeadm, kubectl)
+  ansible.builtin.yum:
+    name:
+      - kubelet-1.28.2-0  # 强烈建议锁定版本，避免集群节点版本不一致
+      - kubeadm-1.28.2-0
+      - kubectl-1.28.2-0
+    state: present
+    update_cache: yes   # 确保读取到刚配置的阿里云最新索引
+
+- name: 配置 kubelet 开机自启
+  ansible.builtin.service:
+    name: kubelet
+    state: started
+    enabled: yes
+

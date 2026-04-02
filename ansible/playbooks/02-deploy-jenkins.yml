@@ -1,0 +1,6 @@
+- name: 部署 Jenkins
+  hosts: masters
+  vars_files:
+    - /root/project/ansible/inventories/group_vars/vault.yml
+  roles:
+    - jenkins

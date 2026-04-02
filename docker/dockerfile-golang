@@ -1,0 +1,23 @@
+# 声明变量
+ARG APP_NAME_ARG
+
+# 第一阶段：编译
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/golang:1.25-alpine3.21 AS builder
+ARG APP_NAME_ARG
+WORKDIR /app
+COPY . .
+# 使用变量作为输出文件名
+RUN CGO_ENABLED=0 GOOS=linux go build -o ${APP_NAME_ARG} main.go
+
+# 第二阶段：运行
+FROM m.daocloud.io/docker.io/alpine:latest
+ARG APP_NAME_ARG
+# 这里的环境变量是为了让 CMD 也能引用到它
+ENV APP_NAME_ENV=${APP_NAME_ARG}
+WORKDIR /root/
+# 从编译阶段拷贝
+COPY --from=builder /app/${APP_NAME_ENV} .
+RUN chmod +x ${APP_NAME_ENV}
+
+# 执行应用
+ENTRYPOINT ./${APP_NAME_ENV}

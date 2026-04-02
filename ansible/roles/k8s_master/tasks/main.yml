@@ -1,0 +1,38 @@
+- name: 分发 kubeadm 配置文件
+  ansible.builtin.template:
+    src: kubeadm-config.yml.j2
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    mode: '0644'
+
+- name: 初始化 Kubernetes Master (使用配置文件)
+  ansible.builtin.command:
+    cmd: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+  args:
+    # 幂等性：如果 admin.conf 存在，说明已初始化，不再重复执行
+    creates: /etc/kubernetes/admin.conf
+  register: kubeadm_init_output
+
+- name: 打印初始化结果
+  ansible.builtin.debug:
+    var: kubeadm_init_output.stdout_lines
+  when: kubeadm_init_output.changed
+
+- name: 生成并获取集群加入命令
+  ansible.builtin.command: kubeadm token create --print-join-command --ttl=24h
+  register: join_command_raw
+  changed_when: false
+
+- name: 将 join 命令设置为全局变量 (Fact)
+  ansible.builtin.set_fact:
+    k8s_join_command: "{{ join_command_raw.stdout }}"
+  # 关键点：将这个变量分发给所有 workers 组的主机
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  with_items: "{{ groups['workers'] }}"
+
+- name: 执行 Calico 网络插件安装
+  ansible.builtin.include_tasks: calico.yml
+
+
+- name: 执行 local-path 存储插件安装
+  ansible.builtin.include_tasks: local-path.yml

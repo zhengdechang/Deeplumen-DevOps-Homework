@@ -1,0 +1,19 @@
+---
+# Global defaults
+kubernetes_version: "1.28.2"
+pod_network_cidr: "172.25.0.0/16"
+
+# Calico is pinned per request
+calico_version: "v3.28.2"
+calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml"
+
+# Helm/Jenkins settings
+jenkins_namespace: "jenkins"
+jenkins_release_name: "jenkins"
+jenkins_helm_repo_name: "jenkins"
+jenkins_helm_repo_url: "https://charts.jenkins.io"
+jenkins_helm_chart_ref: "jenkins/jenkins"
+jenkins_helm_chart_version: "5.6.4"
+jenkins_values_file: "/tmp/jenkins-values.yml"
+jenkins_node_port: 32001
+jenkins_storage_size: "11Gi"
